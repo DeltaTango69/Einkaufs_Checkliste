@@ -21,7 +21,7 @@ At the top of the app, you will find three status LEDs. They show you in real-ti
 
 This is your access to the app. Please use your personal **MQTT username and password**.
 
-**![][(image/image1.png)**
+![][(image/image1.png)
 
 * **Important:** Every family member needs their own individual account. This is the only way the app can track **who** added an item and **when** it was added.  
 * **Persistence:** The app saves your credentials, so you do not need to log in every single time.
@@ -30,7 +30,7 @@ This is your access to the app. Please use your personal **MQTT username and pas
 
 This is where you add new items to the list.
 
-**![][image/image2.png]**
+![](image/image2.png)
 
 * **Tip:** Use the 🎤 button for quick voice input\!  
 * **Categories:** Every item should be assigned a category. Unassigned items will appear in the "⚠️ Assign category\!" list.
@@ -39,7 +39,7 @@ This is where you add new items to the list.
 
 This is where you check off items together.
 
-**![][image/image3.png]**
+![](image/image3.png)
 
 * **Routes:** The list sorts itself automatically based on the settings you defined for each specific store.  
 * **Real-Time:** As soon as someone checks off an item, it disappears for everyone else in real-time.
@@ -48,7 +48,7 @@ This is where you check off items together.
 
 Use this section to maintain your system.
 
-**![][/imageimage4.png]**
+![](/imageimage4.png)
 
 * **Categories:** Here you can rename aisles or move individual products.  
 * **Routes:** Define the perfect order of aisles so you don't have to walk back and forth through the store.
