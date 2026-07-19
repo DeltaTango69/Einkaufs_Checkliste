@@ -1,59 +1,73 @@
-# **Smart Shopping Checklist (Einkaufs-Checkliste V2.0) 🛒**
+Smart Shopping Checklist (Einkaufs-Checkliste V2.0) 🛒
 
 A bilingual, real-time progressive web app (PWA) designed for highly efficient family grocery shopping.
 
-Features real-time synchronization via MQTT, offline-capable UI (Vue.js), and intelligent store-specific category routing.
+🇩🇪 Deutsche Beschreibung unten
 
-[*🇩🇪 Deutsche Beschreibung unten*](#bookmark=id.3bkk89ivq1bw)
+✨ Features
 
-## **✨ Features**
+⚡ Real-Time Sync: Instant updates across devices via MQTT.
 
-* **⚡ Real-Time Sync:** Instant updates across all connected devices using MQTT. If your partner checks off an item, it disappears from your screen immediately.  
-* **🌐 Bilingual:** Fully translated into English and German.  
-* **🌙 Dark / Light Mode:** Automatic system preference detection with manual override.  
-* **🚶‍♂️ Smart Routing (Laufwege):** Categories (aisles) can be sorted individually for *each* store. The app remembers your preferred route through your local supermarket.  
-* **📦 Master Data Management:** Manage stores, categories, and a catalog of items. Easily reassign items to different categories.  
-* **🎤 Voice Input:** Add items quickly using the built-in Web Speech API (supports English and German).  
-* **📱 PWA Ready:** Installable on iOS and Android home screens for an app-like experience.
+🌐 Bilingual: Full support for English and German.
 
-## **🛠 Tech Stack**
+🌙 Dark / Light Mode: Automatic system preference detection.
 
-* **Frontend:** HTML5, CSS3, Vue.js 3 (via CDN/local file), MQTT.js  
-* **Backend:** Node.js, Express.js  
-* **Database:** SQLite3  
-* **Communication:** MQTT (WebSockets), REST API
+🚶‍♂️ Smart Routing: Individual aisle sorting per store.
 
-## **🚀 Installation & Setup**
+📦 Master Data: Manage catalogs and categories easily.
 
-### **Prerequisites**
+🎤 Voice Input: Fast item entry using Web Speech API.
 
-1. **Node.js** installed on your server/machine.  
-2. An active **MQTT Broker** with WebSocket support (e.g., Mosquitto).
+📱 PWA Ready: Installable on iOS and Android.
 
-### **1\. Clone the repository**
+🚀 Installation & Setup
 
-git clone https://github.com/DeltaTango69/einkaufs-checkliste.git  
+Option A: The "Easy Way" (Docker Image)
+
+Recommended for quick deployments.
+
+Create a data directory:
+
+mkdir data
+
+
+Copy example.env to .env and configure your settings:
+
+cp example.env .env
+
+
+Use the provided Docker Compose file:
+
+mv compose_image.yaml compose.yaml
+docker compose up -d
+
+
+Option B: The "Developer Way" (Manual Setup)
+
+Recommended if you want to modify the source code.
+
+Clone the repository:
+
+git clone https://github.com/DeltaTango69/einkaufs-checkliste.git
 cd einkaufs-checkliste
 
-### **2\. Install Dependencies**
+
+Install Dependencies:
 
 npm install
+npm install dotenv
 
-### **3\. Environment Variables**
 
-You can configure the backend using environment variables. Create a .env file or pass them directly:
+Configure:
 
-* PORT: Port for the Express server (Default: 3000\)  
-* DB\_PATH: Path to the SQLite database (Default: ./einkauf.db)  
-* MQTT\_BROKER: IP/Hostname of your MQTT broker (Default: localhost)  
-* MQTT\_PORT: WebSocket port of your MQTT broker (Default: 9001\)  
-* MQTT\_WS\_URL: Full WebSocket URL for secure (HTTPS) connections (e.g., wss://mqtt.yourdomain.com)
+Create a .env file based on example.env.
 
-### **4\. Run the Server**
+Ensure an MQTT broker with WebSocket support is running.
+
+Run the Server:
 
 node server.js
 
-The app will be available at http://localhost:3000.
 
 ## **🇩🇪 Deutsche Beschreibung**
 
@@ -67,10 +81,26 @@ Eine zweisprachige Echtzeit-Web-App (PWA) für hocheffizientes Einkaufen in der 
 * **Spracheingabe:** Artikel einfach per Mikrofon diktieren.  
 * **Verwaltung:** Katalog, Läden und Kategorien lassen sich bequem pflegen und Artikel neu zuweisen.
 
-### **Starten**
+Starten
 
-1. Repository klonen.  
-2. npm install im Ordner ausführen.  
-3. Node-Server mit node server.js starten (benötigt einen laufenden MQTT Broker mit WebSockets).
+Weg 1: Schnellstart mit Docker (Empfohlen)
 
-*Developed with Vue.js & Node.js*
+Erstelle ein Daten-Verzeichnis: mkdir data
+
+Erstelle eine .env Datei aus der example.env.
+
+Benenne compose_image.yaml in compose.yaml um.
+
+Starte den Container: docker compose up -d
+
+Weg 2: Manuelle Installation
+
+Repository klonen.
+
+npm install und npm install dotenv ausführen.
+
+.env Datei konfigurieren.
+
+Server starten mit node server.js.
+
+Developed with Vue.js & Node.js
