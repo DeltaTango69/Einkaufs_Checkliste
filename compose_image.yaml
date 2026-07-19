@@ -1,0 +1,17 @@
+services:
+  einkauf:
+    image: ghcr.io/deltatango69/einkaufs-checkliste:latest
+    container_name: einkauf
+    restart: unless-stopped
+    ports:
+      - "8030:3000"  # Links: Dein Wunsch-Port außen, Rechts: Port aus dem Dockerfile
+    volumes:
+      - ./:/app  # Hier landet die einkauf.db auf deinem Server
+      - /app/node_modules  # Anonymes Volume: Schützt die Node-Abhängigkeiten im Container
+    env_file:         # Hier sagen wir Docker: "Lies die .env Datei!"
+          - .env
+    environment:      # Die Werte aus der .env werden hier gemappt
+      - DATABASE_PATH=${DATABASE_PATH}
+      - MQTT_BROKER=${MQTT_BROKER}
+      - MQTT_WS_URL=${MQTT_WS_URL}
+      - MQTT_PORT=${MQTT_PORT}
