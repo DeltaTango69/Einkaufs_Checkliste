@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Einkaufs-Checkliste</title>
+    
+    <meta name="theme-color" content="#4a90e2">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Einkauf">
+    
+    <link rel="manifest" href="/manifest.json">
+    
+    <script src="vue.global.js"></script>
+    <script src="mqtt.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --bg: #f0f2f5;
+            --card: #ffffff;
+            --accent: #ffdf00;
+            --danger: #f02849;
+            --success: #28a745;
+            --warning-bg: #fffcf0;
+            --warning-border: #ffdf00;
+            --text-main: #1c1e21;
+            --text-muted: #65676b;
+            --input-bg: #ffffff;
+            --border: #dddddd;
+        }
+
+        body.dark-mode {
+            --bg: #18191a;
+            --card: #242526;
+            --text-main: #e4e6eb;
+            --text-muted: #b0b3b8;
+            --input-bg: #3a3b3c;
+            --border: #3e4042;
+            --warning-bg: #332b00;
+            --warning-border: #ffdf00;
+        }
+
+        body {
+            font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0; padding: 10px; background-color: var(--bg); color: var(--text-main);
+            -webkit-tap-highlight-color: transparent;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .app-container {
+            max-width: 500px; margin: 0 auto; background: var(--card); padding: 15px;
+            border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-height: 92vh; display: flex; flex-direction: column;
+        }
+
+        .status-bar {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+            padding: 0 5px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase;
+            color: var(--text-muted);
+        }
+        .status-indicator { display: flex; align-items: center; gap: 5px; }
+        .led { width: 8px; height: 8px; border-radius: 50%; transition: all 0.3s ease; }
+        .led-green { background-color: var(--success); box-shadow: 0 0 6px var(--success); }
+        .led-red { background-color: var(--danger); box-shadow: 0 0 6px var(--danger); }
+        .led-orange { background-color: #ff9800; box-shadow: 0 0 6px #ff9800; }
+
+        .nav-tabs { 
+            display: flex; 
+            flex-wrap: wrap;
+            background: var(--border); 
+            border-radius: 12px; 
+            padding: 4px; 
+            margin-bottom: 20px; 
+        }
+        .nav-btn { 
+            flex: 1 1 auto;
+            border: none; 
+            padding: 12px 10px; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            font-weight: 700; 
+            background: none; 
+            color: var(--text-muted); 
+            font-size: 0.9rem; 
+            text-align: center; 
+        }
+
+        .shop-tabs { 
+            display: flex; 
+            flex-wrap: wrap;
+            gap: 10px; 
+            margin-bottom: 20px; 
+            padding-bottom: 10px; 
+        }
+        .shop-tab { 
+            padding: 12px 20px; 
+            background: var(--border); 
+            border-radius: 30px; 
+            border: none; 
+            cursor: pointer; 
+            font-weight: 700; 
+            color: var(--text-muted); 
+            font-size: 1rem; 
+            transition: all 0.2s ease;
+        }
+        .shop-tab.active { background: var(--primary); color: white; box-shadow: 0 4px 8px rgba(74, 144, 226, 0.3); }
+
+        .section { border: 1px solid var(--border); padding: 15px; border-radius: 14px; margin-bottom: 20px; background: var(--card); position: relative; }
+        h2 { font-size: 1.1rem; margin-top: 0; color: var(--text-main); }
+        input, select { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; background: var(--input-bg); color: var(--text-main); outline: none; border: 1px solid var(--border); }
+        
+        .suggestion-box { position: absolute; top: 110px; left: 15px; right: 15px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 1000; max-height: 200px; overflow-y: auto; }
+        
+        .regal-suggestion-box { 
+            position: absolute; 
+            top: 65px; 
+            left: 0; 
+            right: 0; 
+            background: var(--card); 
+            border: 1px solid var(--border); 
+            border-radius: 10px; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3); 
+            z-index: 1100; 
+            max-height: 200px; 
+            overflow-y: auto; 
+        }
+
+        .suggestion-item { padding: 14px 15px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .suggestion-item:hover { background: var(--bg); }
+        
+        .btn-primary { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 10px; cursor: pointer; width: 100%; font-weight: 700; font-size: 1.1rem; margin-top: 10px; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 14px; border-radius: 10px; cursor: pointer; font-weight: 600; width: 100%; margin-top: 10px; }
+        .btn-danger { background-color: var(--danger); color: white; border: none; }
+        .btn-success { background-color: var(--success); color: white; border: none; }
+        .btn-small { padding: 8px 12px; font-size: 0.85rem; width: auto; margin: 0; }
+        
+        .regal-header { background: var(--border); padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .regal-header button { cursor: pointer; transition: opacity 0.2s; }
+        .regal-header button:hover { opacity: 0.7; }        
+        .item-row { display: flex; align-items: center; padding: 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .qty-badge { background: var(--accent); padding: 4px 12px; border-radius: 8px; font-size: 0.9rem; margin-right: 15px; font-weight: 800; min-width: 35px; text-align: center; color: #000; }
+        .item-name { flex-grow: 1; font-size: 1.1rem; }
+        .item-name.done { text-decoration: line-through; color: var(--text-muted); }
+        .item-meta { font-size: 0.7rem; color: var(--text-muted); display: block; margin-top: 2px; }
+
+        .regal-manage-row { margin-bottom: 15px; border: 1px solid var(--border); padding: 15px; border-radius: 12px; transition: all 0.2s; }
+        .regal-manage-row.priority { border-color: var(--warning-border); background: var(--warning-bg); }
+        .item-count-badge { font-size: 0.75rem; background: var(--border); padding: 2px 8px; border-radius: 6px; font-weight: 800; color: var(--text-muted); }
+        .priority .item-count-badge { background: var(--accent); color: #000; }
+
+        .quick-assign-list { margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 10px; }
+        .quick-assign-item { display: flex; flex-direction: column; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .quick-assign-item:last-child { border: none; }
+        .quick-assign-name { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .quick-assign-select { margin: 0 !important; padding: 8px !important; font-size: 0.85rem !important; }
+
+        .voice-btn { position: absolute; right: 20px; top: 20px; background: none; border: none; font-size: 1.4rem; cursor: pointer; z-index: 10; padding: 10px; border-radius: 50%; transition: all 0.3s; }
+        .voice-active { 
+            color: var(--danger) !important; 
+            background-color: rgba(240, 40, 73, 0.15);
+            animation: mic-glow-pulse 1.5s infinite ease-in-out;
+        }
+        @keyframes mic-glow-pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(240, 40, 73, 0.5); }
+            70% { transform: scale(1.2); box-shadow: 0 0 0 15px rgba(240, 40, 73, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(240, 40, 73, 0); }
+        }
+
+        .details-box { background: var(--bg); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin: 10px 0; border-left: 5px solid var(--primary); }
+        .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .shop-check { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; }
+        .shop-check input { width: 22px; height: 22px; margin: 0; }
+
+        .input-row { display: flex; gap: 10px; align-items: center; }
+        .edit-toggle { display: inline-flex; align-items: center; gap: 5px; color: var(--primary); font-size: 0.85rem; font-weight: 700; cursor: pointer; margin-top: 15px; text-decoration: underline; }
+        .toggle-completed { margin-top: 20px; text-align: center; cursor: pointer; text-decoration: underline; color: var(--text-muted); font-size: 0.9rem; padding: 15px; }
+
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="app" class="app-container" v-cloak>
+    
+    <div class="status-bar">
+        <div style="font-weight: 900; font-size: 0.8rem; color: var(--primary);">{{ t('app_title') }}</div>
+        <div style="display: flex; gap: 12px;">
+            <div class="status-indicator">
+                <span :class="['led', mqttConnected ? 'led-green' : 'led-red']"></span> MQTT
+            </div>
+            <div class="status-indicator">
+                <span :class="['led', dataLoaded ? 'led-green' : 'led-red']"></span> DATA
+            </div>
+            <div class="status-indicator">
+                <span :class="['led', syncStatus === 'error' ? 'led-red' : (syncStatus === 'syncing' ? 'led-orange' : 'led-green')]"></span> SYNC
+            </div>
+        </div>
+    </div>
+
+    <!-- Login -->
+    <div v-if="!isLoggedIn" class="section">
+        <h2>{{ t('login_title') }}</h2>
+        <input type="text" v-model="creds.u" :placeholder="t('user_ph')">
+        <input type="password" v-model="creds.p" :placeholder="t('pass_ph')">
+        <button @click="login" class="btn-primary" :disabled="loading">{{ loading ? t('btn_connecting') : t('btn_login') }}</button>
+    </div>
+
+    <!-- App Inhalt -->
+    <div v-else style="display:contents">
+        <div class="nav-tabs">
+            <button @click="view = 'plan'" :class="['nav-btn', { active: view === 'plan' }]">{{ t('tab_plan') }}</button>
+            <button @click="view = 'shop'" :class="['nav-btn', { active: view === 'shop' }]">{{ t('tab_shop') }}</button>
+            <button @click="view = 'catalog'" :class="['nav-btn', { active: view === 'catalog' }]">{{ t('tab_cart') }}</button>
+            <button @click="view = 'settings'" :class="['nav-btn', { active: view === 'settings' }]">{{ t('tab_settings') }}</button>
+        </div>
+
+        <!-- REITER: PLANEN -->
+        <div v-if="view === 'plan'">
+            <div class="section">
+                <h2>{{ t('plan_add') }}</h2>
+                <button @click="toggleVoice" class="voice-btn" :class="{ 'voice-active': isListening }">🎤</button>
+                
+                <div style="position: relative;">
+                    <input type="text" v-model="search" ref="searchInput" autocomplete="off" :placeholder="t('plan_search_ph')" @input="onSearchInput" @keyup.enter="onSearchEnter">
+                    <div v-if="showSuggestions && filteredSuggestions.length > 0" class="suggestion-box">
+                        <div v-for="s in filteredSuggestions" :key="s.id" class="suggestion-item" @mousedown.prevent="selectSuggestion(s)" @touchstart.prevent="selectSuggestion(s)">
+                            <span>{{ s.name }}</span>
+                            <span style="font-size:0.7rem; color:var(--text-muted)">{{ displayRegal(s.regal) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-row" style="display: flex; gap: 20px; align-items: flex-start;">
+                    <!-- Regal-Feld -->
+                    <div style="flex: 1; min-width: 0; position: relative;">
+                        <label style="display: block; font-size: 0.7rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">{{ t('plan_cat_label') }}</label>
+                        <input type="text" 
+                                v-model="displayNewRegal" 
+                                :placeholder="t('plan_cat_ph')" 
+                                style="width: 100%; margin: 0;"
+                                @focus="handleRegalFocus" 
+                                @input="showRegalSuggestions = true"
+                                @blur="handleRegalBlur">
+                        
+                        <div v-if="showRegalSuggestions && filteredRegalSuggestions.length > 0" class="regal-suggestion-box">
+                            <div v-for="r in filteredRegalSuggestions" :key="r" class="suggestion-item" @mousedown.prevent="selectRegalSuggestion(r)" @touchstart.prevent="selectRegalSuggestion(r)">
+                                <span>{{ displayRegal(r) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Mengen-Feld -->
+                    <div style="width: 85px; flex-shrink: 0;">
+                        <label style="display: block; font-size: 0.7rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">{{ t('plan_qty_label') }}</label>
+                        <input type="number" 
+                                v-model="qty" 
+                                ref="qtyInput" 
+                                :placeholder="t('plan_qty_ph')" 
+                                min="1" 
+                                style="width: 100%; margin: 0; text-align: center;"
+                                @keyup.enter="addItem">
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column;">
+                    <button @click="addItem" class="btn-primary" :disabled="!search">{{ isNew ? t('btn_create_add') : t('btn_add') }}</button>
+                    <button v-if="search.trim()" @click="cancelEdit" class="btn-outline">{{ t('btn_cancel') }}</button>
+                </div>
+
+                <div v-if="search.trim()" @click="showDetails = !showDetails" class="edit-toggle">
+                    {{ showDetails ? t('toggle_hide_shops') : t('toggle_show_shops') }}
+                </div>
+
+                <div v-if="showDetails && search.trim()" class="details-box">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong>{{ isNew ? t('item_new_title') : t('item_edit_title') }}</strong>
+                        <button v-if="!isNew" @click.stop="confirmDeleteCatalog = true" class="btn-outline btn-small" style="color:var(--danger); border-color:var(--danger)">🗑️</button>
+                    </div>
+                    
+                    <label style="font-size:0.75rem; color:var(--text-muted); font-weight:800; display:block; margin-top:15px; text-transform: uppercase;">{{ t('available_in') }}</label>
+                    <div class="shop-grid">
+                        <label v-for="s in shops" :key="s.id" class="shop-check">
+                            <input type="checkbox" :value="s.id" v-model="newShops"> {{ s.name }}
+                        </label>
+                    </div>
+
+                    <div v-if="confirmDeleteCatalog" style="margin-top:15px; border:1px solid var(--danger); padding:10px; border-radius:10px; background: rgba(240, 40, 73, 0.05);">
+                        <p style="font-size:0.8rem">{{ t('confirm_del_catalog') }}</p>
+                        <button @click="deleteItemFromCatalog" class="btn-primary btn-small btn-danger">{{ t('btn_delete') }}</button>
+                        <button @click="confirmDeleteCatalog = false" class="btn-outline btn-small">{{ t('btn_abort') }}</button>
+                    </div>
+                    <button v-if="!isNew" @click="updateCatalogOnly" class="btn-primary btn-success" style="margin-top:20px;">{{ t('btn_save_master') }}</button>
+                </div>
+            </div>
+
+            <!-- Planungsliste -->
+            <div v-if="planItemsGrouped.length > 0" class="section" style="padding:0">
+                <div style="padding:15px; display:flex; justify-content:space-between; border-bottom: 1px solid var(--border);">
+                    <h3>{{ t('checklist_title') }}</h3>
+                    <button @click="confirmClearAll = true" class="btn-outline btn-small" style="color:var(--danger); border-color:var(--danger)">{{ t('btn_clear_all') }}</button>
+                </div>
+                <div v-if="confirmClearAll" style="padding:15px; text-align:center;">
+                    <button @click="clearAll" class="btn-primary btn-small btn-danger">{{ t('confirm_clear_all') }}</button>
+                    <button @click="confirmClearAll = false" class="btn-outline btn-small">{{ t('btn_abort') }}</button>
+                </div>
+                
+                <div v-for="group in planItemsGrouped" :key="group.name">
+                    <div class="regal-header">
+                        <span style="font-weight:800; font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">{{ displayRegal(group.name) }}</span>
+                    </div>
+                    <div v-for="item in group.items" :key="item.id" class="item-row" @click="selectForEdit(item)">
+                        <span class="qty-badge">{{ activeList[item.id].qty }}x</span>
+                        <div style="flex-grow:1">
+                            <span :class="['item-name', { 'done': activeList[item.id].checked }]">{{ item.name }}</span>
+                            <span class="item-meta" v-if="activeList[item.id].addedBy">
+                                {{ t('by') }} {{ activeList[item.id].addedBy }} • {{ formatTime(activeList[item.id].addedAt) }}
+                            </span>
+                        </div>
+                        <button @click.stop="removeItem(item.id)" style="background:none; border:none; color:var(--text-muted); padding:10px; font-size:1.2rem;">✕</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- REITER: EINKAUFEN -->
+        <div v-if="view === 'shop'">
+            <div class="shop-tabs">
+                <button v-for="s in shops" :key="s.id" @click="currentShop = s.id" :class="['shop-tab', { active: currentShop === s.id }]">{{ s.name }}</button>
+            </div>
+            <div v-if="visibleRegals.length > 0">
+                <div v-for="regal in visibleRegals" :key="regal" style="margin-bottom:15px;">
+                    <div class="regal-header">
+                        <span style="font-weight:800; font-size:0.8rem; color:var(--text-muted); text-transform:uppercase;">{{ displayRegal(regal) }}</span>
+                    </div>
+                    <div v-for="i in filteredItemsByRegal[regal.trim()]" :key="i.id">
+                        <div v-if="!activeList[i.id].checked || showCompleted" class="item-row" @click="toggleItem(i.id)">
+                            <div style="margin-right:15px; font-size:1.6rem;">{{ activeList[i.id].checked ? '✅' : '⬜' }}</div>
+                            <span class="qty-badge">{{ activeList[i.id].qty }}x</span>
+                            <span :class="['item-name', { 'done': activeList[i.id].checked }]">{{ i.name }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="toggle-completed" @click="showCompleted = !showCompleted">{{ showCompleted ? t('btn_hide_done') : t('btn_show_done') }}</div>
+            </div>
+            <div v-else style="text-align:center; padding:50px; color:var(--text-muted)">{{ t('all_done') }}</div>
+        </div>
+
+        <!-- REITER: WARENKORB -->
+        <div v-if="view === 'catalog'">
+            <div class="section">
+                <h2>{{ t('tab_cart') }} ({{ catalog.length }})</h2>
+                <div v-for="group in catalogGrouped" :key="group.name">
+                    <div class="regal-header"><span>{{ displayRegal(group.name) }}</span></div>
+                    <div v-for="item in group.items" :key="item.id" class="item-row" @click="selectForEdit(item)">
+                        <span style="flex-grow:1">{{ item.name }}</span>
+                        <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end;">
+                            <button v-for="sid in item.laeden" :key="sid" style="font-size:0.65rem; background:var(--border); border:none; border-radius:6px; padding:4px 8px; font-weight:700; color:var(--text-muted)" @click.stop="removeShopFromItem(item, sid)">{{ getShopName(sid) }} ✕</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- REITER: VERWALTUNG -->
+        <div v-if="view === 'settings'">
+            <!-- Sprache (Language Toggle) -->
+            <div class="section" style="padding:0; overflow:hidden;">
+                <div @click="expandedSection = expandedSection === 'lang' ? '' : 'lang'" style="padding: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin:0;">{{ t('language') }}</h2>
+                    <span style="color:var(--text-muted)">{{ expandedSection === 'lang' ? '▲' : '▼' }}</span>
+                </div>
+                <div v-show="expandedSection === 'lang'" style="padding: 0 15px 15px 15px;">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">{{ t('language_desc') }}</p>
+                    <select v-model="appLang" @change="saveLanguage">
+                        <option value="de">Deutsch</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Darstellung (Darkmode Toggle) -->
+            <div class="section" style="padding:0; overflow:hidden;">
+                <div @click="expandedSection = expandedSection === 'theme' ? '' : 'theme'" style="padding: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin:0;">{{ t('appearance') }}</h2>
+                    <span style="color:var(--text-muted)">{{ expandedSection === 'theme' ? '▲' : '▼' }}</span>
+                </div>
+                <div v-show="expandedSection === 'theme'" style="padding: 0 15px 15px 15px;">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">{{ t('appearance_desc') }}</p>
+                    <select v-model="themePreference" @change="applyThemePreference">
+                        <option value="auto">{{ t('theme_auto') }}</option>
+                        <option value="light">{{ t('theme_light') }}</option>
+                        <option value="dark">{{ t('theme_dark') }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Läden -->
+            <div class="section" style="padding:0; overflow:hidden;">
+                <div @click="expandedSection = expandedSection === 'shops' ? '' : 'shops'" style="padding: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin:0;">{{ t('manage_shops') }}</h2>
+                    <span style="color:var(--text-muted)">{{ expandedSection === 'shops' ? '▲' : '▼' }}</span>
+                </div>
+                <div v-show="expandedSection === 'shops'" style="padding: 0 15px 15px 15px;">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:15px;">{{ t('manage_shops_desc') }}</p>
+                    <div v-for="(s, index) in shops" :key="s.id" style="margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 15px;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="text" v-model="s.name" @blur="save" style="margin:0" :placeholder="t('shop_name_ph')">
+                            <button @click="confirmDeleteShopIdx = index" class="btn-outline btn-small" style="color:var(--danger); border-color:var(--danger)">🗑️</button>
+                        </div>
+                        
+                        <div v-if="confirmDeleteShopIdx === index" style="margin-top:10px; border:1px solid var(--danger); padding:15px; border-radius:12px; background:rgba(240,40,73,0.05)">
+                            <p style="font-size:0.9rem; margin-bottom:10px;"><strong>{{ s.name }}</strong> {{ t('really_delete') }}</p>
+                            <div style="display:flex; gap:10px;">
+                                <button @click="deleteShop(index)" class="btn-primary btn-small btn-danger" style="flex:1">{{ t('btn_delete') }}</button>
+                                <button @click="confirmDeleteShopIdx = null" class="btn-outline btn-small" style="flex:1">{{ t('btn_abort') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="shops.length < 5" style="margin-top:20px;">
+                        <input type="text" v-model="newShopInput" :placeholder="t('new_shop_ph')" @keyup.enter="addShop">
+                        <button @click="addShop" class="btn-primary" :disabled="!newShopInput.trim()">{{ t('btn_add_shop') }}</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kategorien -->
+            <div class="section" style="padding:0; overflow:hidden;">
+                <div @click="expandedSection = expandedSection === 'categories' ? '' : 'categories'" style="padding: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin:0;">{{ t('manage_cats') }}</h2>
+                    <span style="color:var(--text-muted)">{{ expandedSection === 'categories' ? '▲' : '▼' }}</span>
+                </div>
+                <div v-show="expandedSection === 'categories'" style="padding: 0 15px 15px 15px;">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:15px;">{{ t('manage_cats_desc') }}</p>
+                    <div v-for="(regal, index) in existingRegals" :key="regal" :class="['regal-manage-row', { priority: isPriorityRegal(regal) }]">
+                        <div @click="expandedRegalCategory = expandedRegalCategory === regal ? '' : regal" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; cursor:pointer;">
+                            <strong style="font-size:0.85rem; color:var(--text-muted)">{{ isPriorityRegal(regal) ? t('action_req') : t('cat_label') }}</strong>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span class="item-count-badge">{{ getItemCountPerRegal(regal) }} {{ t('items_count') }}</span>
+                                <span style="color:var(--text-muted); font-size: 0.8rem;">{{ expandedRegalCategory === regal ? '▲' : '▼' }}</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="text" :value="displayRegal(regal)" @blur="renameRegal(regal, $event.target.value)" style="margin:0" :placeholder="t('cat_name_ph')" :disabled="isPriorityRegal(regal)">
+                            <button v-if="!isPriorityRegal(regal)" @click="confirmDeleteRegalName = regal" class="btn-outline btn-small" style="color:var(--danger); border-color:var(--danger)">🗑️</button>
+                        </div>
+
+                        <div v-if="isPriorityRegal(regal) && getItemsByRegal(regal).length > 0" class="quick-assign-list">
+                            <p style="font-size:0.7rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:5px;">{{ t('assign_single') }}</p>
+                            <div v-for="item in getItemsByRegal(regal)" :key="item.id" class="quick-assign-item">
+                                <div class="quick-assign-name" @click="expandedItemForMove = expandedItemForMove === item.id ? null : item.id">
+                                    <span>{{ item.name }}</span>
+                                    <span style="color:var(--primary); font-size: 0.75rem;">{{ expandedItemForMove === item.id ? '▲' : t('move_edit') }}</span>
+                                </div>
+                                <select v-if="expandedItemForMove === item.id" class="quick-assign-select" @change="moveSingleItem(item, $event.target.value)">
+                                    <option value="" disabled selected>{{ t('choose_regal') }}</option>
+                                    <option v-for="other in otherRegals" :key="other" :value="other">{{ displayRegal(other) }}</option>
+                                    <option value="NEW">{{ t('new_regal') }}</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div v-show="expandedRegalCategory === regal && !isPriorityRegal(regal) && getItemsByRegal(regal).length > 0" class="quick-assign-list">
+                            <p style="font-size:0.7rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:5px;">{{ t('contained_items') }}</p>
+                            <div v-for="item in getItemsByRegal(regal)" :key="item.id" class="quick-assign-item">
+                                <div class="quick-assign-name" @click="expandedItemForMove = expandedItemForMove === item.id ? null : item.id">
+                                    <span>{{ item.name }}</span>
+                                    <span style="color:var(--primary); font-size: 0.75rem;">{{ expandedItemForMove === item.id ? '▲' : t('move_edit') }}</span>
+                                </div>
+                                <select v-if="expandedItemForMove === item.id" class="quick-assign-select" @change="moveSingleItem(item, $event.target.value)">
+                                    <option value="" disabled selected>{{ t('move_to') }}</option>
+                                    <option v-for="other in otherRegals" :key="other" :value="other">{{ displayRegal(other) }}</option>
+                                    <option value="NEW">{{ t('new_regal') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div v-if="confirmDeleteRegalName === regal" style="margin-top:10px; border:1px solid var(--danger); padding:15px; border-radius:12px; background:rgba(240,40,73,0.05)">
+                            <p style="font-size:0.9rem; margin-bottom:10px;"><strong>{{ displayRegal(regal) }}</strong> {{ t('confirm_delete') }}</p>
+                            <div style="display:flex; gap:10px;">
+                                <button @click="deleteRegal(regal)" class="btn-primary btn-small btn-danger" style="flex:1">{{ t('btn_delete') }}</button>
+                                <button @click="confirmDeleteRegalName = null" class="btn-outline btn-small" style="flex:1">{{ t('btn_abort') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top:20px;">
+                        <input type="text" v-model="newRegalInput" :placeholder="t('new_cat_ph')" @keyup.enter="addRegal">
+                        <button @click="addRegal" class="btn-primary" :disabled="!newRegalInput.trim()">{{ t('btn_add_cat') }}</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Laufwege / Sortierung -->
+            <div class="section" style="padding:0; overflow:hidden;">
+                <div @click="expandedSection = expandedSection === 'sort' ? '' : 'sort'" style="padding: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin:0;">{{ t('routes') }}</h2>
+                    <span style="color:var(--text-muted)">{{ expandedSection === 'sort' ? '▲' : '▼' }}</span>
+                </div>
+                <div v-show="expandedSection === 'sort'" style="padding: 0 15px 15px 15px;">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:15px;">{{ t('routes_desc') }}</p>
+                    <select v-model="selectedShopForSort" style="margin-bottom: 15px;">
+                        <option v-for="s in shops" :key="s.id" :value="s.id">{{ s.name }}</option>
+                    </select>
+                    
+                    <div v-if="selectedShopForSort">
+                        <div v-if="getFullRegalOrder(selectedShopForSort).length === 0" style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.9rem;">
+                            {{ t('no_items_shop') }}
+                        </div>
+                        <div v-for="(regal, index) in getFullRegalOrder(selectedShopForSort)" :key="regal" class="item-row" style="padding: 10px; background: var(--bg); margin-bottom: 5px; border-radius: 8px; border: none;">
+                            <span style="flex-grow: 1; font-weight: 600; font-size: 0.9rem; color: var(--text-main);">{{ index + 1 }}. {{ displayRegal(regal) }}</span>
+                            <div style="display: flex; gap: 5px;">
+                                <button @click="moveRegalInShop(selectedShopForSort, regal, -1)" :disabled="index === 0" style="background:var(--border); border:none; color:var(--text-main); font-size:1.2rem; padding:4px 12px; cursor:pointer; border-radius:6px; transition: opacity 0.2s;" :style="{opacity: index === 0 ? 0.3 : 1}">▲</button>
+                                <button @click="moveRegalInShop(selectedShopForSort, regal, 1)" :disabled="index === getFullRegalOrder(selectedShopForSort).length - 1" style="background:var(--border); border:none; color:var(--text-main); font-size:1.2rem; padding:4px 12px; cursor:pointer; border-radius:6px; transition: opacity 0.2s;" :style="{opacity: index === getFullRegalOrder(selectedShopForSort).length - 1 ? 0.3 : 1}">▼</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button @click="logout" style="margin-top:auto; padding:20px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.8rem">{{ t('btn_logout') }} ({{ creds.u }})</button>
+    </div>
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+const DEFAULT_REGAL = "⚠️ Kategorie zuweisen!";
+
+const translations = {
+    de: {
+        app_title: "V2.0",
+        login_title: "🔑 Login",
+        user_ph: "Benutzername",
+        pass_ph: "Passwort",
+        btn_connecting: "Verbinde...",
+        btn_login: "Anmelden",
+        tab_plan: "📝 Planen",
+        tab_shop: "🛒 Einkaufen",
+        tab_cart: "📦 Warenkorb",
+        tab_settings: "⚙️ Verwaltung",
+        plan_add: "Artikel hinzufügen",
+        plan_search_ph: "Was brauchst du?",
+        plan_cat_label: "Kategorie / Regal:",
+        plan_cat_ph: "Regal",
+        plan_qty_label: "Menge:",
+        plan_qty_ph: "Stk",
+        btn_create_add: "Anlegen & Hinzufügen",
+        btn_add: "Hinzufügen",
+        btn_cancel: "Abbrechen",
+        toggle_hide_shops: "🔼 Läden verbergen",
+        toggle_show_shops: "⚙️ Erweitert (Läden anpassen)",
+        item_new_title: "✨ Neuer Artikel",
+        item_edit_title: "⚙️ Stammdaten",
+        available_in: "Verfügbar in:",
+        confirm_del_catalog: "Vollständig aus Katalog löschen?",
+        btn_delete: "Löschen",
+        btn_abort: "Abbruch",
+        btn_save_master: "Stammdaten speichern",
+        checklist_title: "Checkliste",
+        btn_clear_all: "Alle weg",
+        confirm_clear_all: "Ja, alles weg",
+        by: "von",
+        just_now: "gerade eben",
+        mins_ago: "vor {n} Min.",
+        hrs_ago: "vor {n} Std.",
+        yesterday: "gestern",
+        days_ago: "vor {n} Tagen",
+        at: "um",
+        clock: "Uhr",
+        btn_hide_done: "Erledigte ausblenden",
+        btn_show_done: "Erledigte anzeigen",
+        all_done: "✨ Alles erledigt!",
+        appearance: "🌙 Darstellung",
+        appearance_desc: "Wähle dein bevorzugtes Design für die App.",
+        theme_auto: "System (Auto)",
+        theme_light: "Hell",
+        theme_dark: "Dunkel",
+        language: "🌐 Sprache",
+        language_desc: "Wähle die Anzeigesprache / Choose your language.",
+        manage_shops: "⚙️ Läden verwalten",
+        manage_shops_desc: "Läden hinzufügen, umbenennen oder löschen (max. 5).",
+        shop_name_ph: "Laden Name",
+        really_delete: "wirklich löschen?",
+        new_shop_ph: "Neuer Laden Name",
+        btn_add_shop: "Laden hinzufügen",
+        manage_cats: "📦 Kategorien verwalten",
+        manage_cats_desc: "Hier kannst du Regalnamen global umbenennen oder Artikel einzeln verschieben.",
+        action_req: "⚠️ Handlungsbedarf",
+        cat_label: "Kategorie",
+        cat_name_ph: "Kategorie Name",
+        assign_single: "Einzelne Artikel zuweisen:",
+        contained_items: "Enthaltene Artikel:",
+        move_edit: "✎ Verschieben",
+        choose_regal: "Regal wählen...",
+        move_to: "Verschieben nach...",
+        new_regal: "+ Neues Regal...",
+        confirm_delete: "löschen?",
+        new_cat_ph: "Neue Kategorie (Regal)",
+        btn_add_cat: "Kategorie anlegen",
+        routes: "🚶‍♂️ Laufwege (Sortierung)",
+        routes_desc: "Lege für jeden Laden die optimale Reihenfolge aller relevanten Regale fest.",
+        no_items_shop: "Dieser Laden hat noch keine zugewiesenen Artikel.",
+        btn_logout: "Abmelden",
+        default_regal: "⚠️ Kategorie zuweisen!",
+        items_count: "Artikel"
+    },
+    en: {
+        app_title: "V2.0",
+        login_title: "🔑 Login",
+        user_ph: "Username",
+        pass_ph: "Password",
+        btn_connecting: "Connecting...",
+        btn_login: "Sign In",
+        tab_plan: "📝 Plan",
+        tab_shop: "🛒 Shop",
+        tab_cart: "📦 Catalog",
+        tab_settings: "⚙️ Settings",
+        plan_add: "Add Item",
+        plan_search_ph: "What do you need?",
+        plan_cat_label: "Category / Aisle:",
+        plan_cat_ph: "Category",
+        plan_qty_label: "Qty:",
+        plan_qty_ph: "Pcs",
+        btn_create_add: "Create & Add",
+        btn_add: "Add",
+        btn_cancel: "Cancel",
+        toggle_hide_shops: "🔼 Hide shops",
+        toggle_show_shops: "⚙️ Advanced (Manage shops)",
+        item_new_title: "✨ New Item",
+        item_edit_title: "⚙️ Master Data",
+        available_in: "Available in:",
+        confirm_del_catalog: "Delete entirely from catalog?",
+        btn_delete: "Delete",
+        btn_abort: "Cancel",
+        btn_save_master: "Save Master Data",
+        checklist_title: "Checklist",
+        btn_clear_all: "Clear All",
+        confirm_clear_all: "Yes, clear all",
+        by: "by",
+        just_now: "just now",
+        mins_ago: "{n} mins ago",
+        hrs_ago: "{n} hrs ago",
+        yesterday: "yesterday",
+        days_ago: "{n} days ago",
+        at: "at",
+        clock: "",
+        btn_hide_done: "Hide completed",
+        btn_show_done: "Show completed",
+        all_done: "✨ All done!",
+        appearance: "🌙 Appearance",
+        appearance_desc: "Choose your preferred app theme.",
+        theme_auto: "System (Auto)",
+        theme_light: "Light",
+        theme_dark: "Dark",
+        language: "🌐 Language",
+        language_desc: "Wähle die Anzeigesprache / Choose your language.",
+        manage_shops: "⚙️ Manage Shops",
+        manage_shops_desc: "Add, rename or delete shops (max. 5).",
+        shop_name_ph: "Shop Name",
+        really_delete: "really delete?",
+        new_shop_ph: "New Shop Name",
+        btn_add_shop: "Add Shop",
+        manage_cats: "📦 Manage Categories",
+        manage_cats_desc: "Rename categories globally or move individual items.",
+        action_req: "⚠️ Action required",
+        cat_label: "Category",
+        cat_name_ph: "Category Name",
+        assign_single: "Assign individual items:",
+        contained_items: "Contained items:",
+        move_edit: "✎ Move",
+        choose_regal: "Choose category...",
+        move_to: "Move to...",
+        new_regal: "+ New category...",
+        confirm_delete: "delete?",
+        new_cat_ph: "New Category Name",
+        btn_add_cat: "Create category",
+        routes: "🚶‍♂️ Routes (Sorting)",
+        routes_desc: "Set the optimal category order for each shop.",
+        no_items_shop: "This shop has no assigned items yet.",
+        btn_logout: "Logout",
+        default_regal: "⚠️ Assign category!",
+        items_count: "Items"
+    }
+};
+
+createApp({
+    setup() {
+        const view = ref('plan');
+        const isLoggedIn = ref(false);
+        const loading = ref(false);
+        const creds = ref({ u: '', p: '' });
+        const catalog = ref([]);
+        const shops = ref([]);
+        const activeList = ref({});
+        const currentShop = ref('');
+        const mqttClient = ref(null);
+        const mqttConnected = ref(false);
+        const dataLoaded = ref(false); 
+        const showCompleted = ref(false);
+        const themePreference = ref(localStorage.getItem('app_theme') || 'auto');
+        const appLang = ref(localStorage.getItem('app_lang') || 'de');
+        
+        const search = ref('');
+        const qty = ref(1);
+        const isNew = ref(true);
+        const newRegal = ref('');
+        const newShops = ref([]);
+        const showDetails = ref(false);
+        const showSuggestions = ref(false);
+        const showRegalSuggestions = ref(false);
+        const isListening = ref(false);
+        const confirmDeleteCatalog = ref(false);
+        const confirmClearAll = ref(false);
+        const confirmDeleteShopIdx = ref(null);
+        const confirmDeleteRegalName = ref(null);
+        const newShopInput = ref('');
+        const newRegalInput = ref('');       
+        const searchInput = ref(null);
+        const qtyInput = ref(null);
+        const syncStatus = ref('ok');
+        const selectedShopForSort = ref('');
+        const expandedSection = ref('lang');
+        const expandedRegalCategory = ref('');
+        const expandedItemForMove = ref(null);
+
+        // i18n Translation Funktion
+        const t = (key) => translations[appLang.value][key] || key;
+
+        const saveLanguage = () => {
+            localStorage.setItem('app_lang', appLang.value);
+        };
+
+        // Übersetzt nur bei der Anzeige den Systemwert DEFAULT_REGAL
+        const displayRegal = (r) => {
+            if (!r) return "";
+            return r.trim() === DEFAULT_REGAL ? t('default_regal') : r;
+        };
+
+        // Gekoppelte Variable, damit die Eingabe übersetzt angezeigt wird, aber das System "DEFAULT_REGAL" behält
+        const displayNewRegal = computed({
+            get() { return newRegal.value === DEFAULT_REGAL ? t('default_regal') : newRegal.value; },
+            set(val) { newRegal.value = val === t('default_regal') ? DEFAULT_REGAL : val; }
+        });
+
+        const visibleRegals = computed(() => {
+            const shop = shops.value.find(s => s.id === currentShop.value);
+            const activeRegals = [...new Set(catalog.value
+                .filter(c => {
+                    const active = activeList.value[c.id];
+                    if (!active) return false;
+                    const inShop = (c.laeden || []).includes(currentShop.value);
+                    const isVisible = !active.checked || showCompleted.value; 
+                    return inShop && isVisible;
+                })
+                .map(c => (c.regal || DEFAULT_REGAL).trim()))];
+            
+            if (!shop) return activeRegals.sort();
+            
+            const sorted = (shop.regalOrder || [])
+                .map(r => (r || '').trim())
+                .filter(r => r !== '' && activeRegals.includes(r));
+            
+            const missing = activeRegals.filter(r => !sorted.includes(r)).sort();
+            return [...new Set([...sorted, ...missing])];
+        });
+
+        const apiPath = (end) => window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/') + 'api/' + end;
+        
+        const formatTime = (iso) => {
+            if (!iso) return '';
+            const date = new Date(iso);
+            const now = new Date();
+            const diffMin = Math.floor((now - date) / 60000);
+            const diffStd = Math.floor(diffMin / 60);
+            const diffTag = Math.floor(diffStd / 24);
+
+            if (diffMin < 1) return t('just_now');
+            if (diffMin < 60) return t('mins_ago').replace('{n}', diffMin);
+            if (diffStd < 24) return t('hrs_ago').replace('{n}', diffStd);
+            if (diffTag === 1) return t('yesterday');
+            if (diffTag < 7) return t('days_ago').replace('{n}', diffTag);
+            
+            const locale = appLang.value === 'de' ? 'de-DE' : 'en-US';
+            const dateStr = date.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' });
+            return `${dateStr} ${t('at')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')} ${t('clock')}`.trim();
+        };
+
+        const onSearchInput = () => {
+            const term = search.value.trim().toLowerCase();
+            const found = catalog.value.find(c => c.name.toLowerCase() === term);
+            if (found) {
+                newRegal.value = found.regal;
+                newShops.value = [...found.laeden];
+                isNew.value = false;
+            } else {
+                isNew.value = true;
+            }
+            showSuggestions.value = term.length > 0;
+        };
+
+        const selectSuggestion = (s) => {
+            search.value = s.name;
+            newRegal.value = s.regal;
+            newShops.value = [...s.laeden];
+            isNew.value = false;
+            showSuggestions.value = false;
+            if (qtyInput.value) qtyInput.value.focus();
+        };
+
+        const applyThemePreference = () => {
+            localStorage.setItem('app_theme', themePreference.value);
+            let shouldBeDark = false;
+            if (themePreference.value === 'auto') {
+                shouldBeDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            } else {
+                shouldBeDark = themePreference.value === 'dark';
+            }
+            document.body.classList.toggle('dark-mode', shouldBeDark);
+        };
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = appLang.value === 'de' ? 'de-DE' : 'en-US';
+            recognition.onstart = () => { isListening.value = true; };
+            recognition.onend = () => { isListening.value = false; };
+            recognition.onresult = (e) => {
+                search.value = e.results[0][0].transcript;
+                onSearchInput();
+                if (qtyInput.value) qtyInput.value.focus();
+            };
+        }
+        const toggleVoice = () => { if (!recognition) return; if (isListening.value) recognition.stop(); else { recognition.lang = appLang.value === 'de' ? 'de-DE' : 'en-US'; recognition.start(); } };
+
+        const loadData = async () => {
+            try {
+                const res = await fetch(apiPath('data'));
+                const data = await res.json();
+                catalog.value = data.catalog || [];
+                shops.value = data.shops || [];
+                activeList.value = data.activeList || {};
+                if (shops.value.length > 0 && !currentShop.value) currentShop.value = shops.value[0].id;
+                if (shops.value.length > 0 && !selectedShopForSort.value) selectedShopForSort.value = shops.value[0].id;
+                dataLoaded.value = true;
+            } catch (e) { 
+                dataLoaded.value = false; 
+            }
+        };
+
+        const login = async () => {
+            if (!creds.value.u || !creds.value.p) return;
+            loading.value = true;
+            try {
+                const configRes = await fetch(apiPath('config'));
+                const config = await configRes.json();
+                const isSec = window.location.protocol === 'https:';
+                const broker = isSec ? config.wsUrl : `ws://${config.broker}:${config.port}`;
+                
+                mqttClient.value = mqtt.connect(broker, { 
+                    username: creds.value.u, 
+                    password: creds.value.p, 
+                    reconnectPeriod: 5000, 
+                    clientId: 'shop_' + Math.random().toString(16).substr(2, 6), 
+                    connectTimeout: 10000 
+                });
+
+                mqttClient.value.on('connect', () => { 
+                    mqttConnected.value = true; 
+                    isLoggedIn.value = true; 
+                    loading.value = false; 
+                    localStorage.setItem('e_u', creds.value.u); 
+                    localStorage.setItem('e_p', creds.value.p); 
+                    mqttClient.value.subscribe('home/einkauf/state'); 
+                });
+                mqttClient.value.on('close', () => mqttConnected.value = false);
+                mqttClient.value.on('message', (tMsg, m) => { if (tMsg === 'home/einkauf/state') { activeList.value = JSON.parse(m.toString()); } });
+                mqttClient.value.on('error', () => { loading.value = false; });
+            } catch (e) {
+                loading.value = false;
+                console.error("Verbindungsfehler:", e);
+            }
+        };
+
+        const saveItemToSQLite = async (id, itemData, catalogData = null) => {
+            syncStatus.value = 'syncing';
+            try {
+                const res = await fetch(apiPath('save-item'), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id, itemData, catalogData })
+                });
+                if (res.ok) {
+                    syncStatus.value = 'ok';
+                    if (mqttClient.value?.connected) {
+                        mqttClient.value.publish('home/einkauf/state', JSON.stringify(activeList.value), { retain: true });
+                    }
+                } else { syncStatus.value = 'error'; }
+            } catch (e) { syncStatus.value = 'error'; }
+        };
+
+        const addItem = async () => {
+            const n = search.value.trim(); if (!n) return;
+            const r = newRegal.value.trim() || DEFAULT_REGAL;
+            let item = catalog.value.find(c => c.name.toLowerCase() === n.toLowerCase());
+            
+            if (!item) {
+                item = { 
+                    id: "ART_" + Date.now(), 
+                    name: n, 
+                    regal: r, 
+                    laeden: newShops.value.length > 0 ? [...newShops.value] : shops.value.map(s => s.id) 
+                };
+                catalog.value.push(item);
+            }
+            
+            const activeEntry = { 
+                qty: qty.value || 1, 
+                checked: false, 
+                addedBy: creds.value.u, 
+                addedAt: new Date().toISOString() 
+            };
+            
+            activeList.value[item.id] = activeEntry;
+            await saveItemToSQLite(item.id, activeEntry, item);
+            cancelEdit();
+        };
+
+        const save = async () => {
+            syncStatus.value = 'syncing';
+            try {
+                const res = await fetch(apiPath('save-all'), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        shops: shops.value,
+                        catalog: catalog.value,
+                        activeList: activeList.value 
+                    })
+                });
+                if (res.ok) {
+                    syncStatus.value = 'ok';
+                } else {
+                    syncStatus.value = 'error';
+                }
+            } catch (e) {
+                syncStatus.value = 'error';
+            }
+        };
+
+        const cancelEdit = () => { search.value = ''; qty.value = 1; showDetails.value = false; showSuggestions.value = false; isNew.value = true; newRegal.value = ''; newShops.value = []; if (searchInput.value) searchInput.value.focus(); };
+
+        const addShop = async () => {
+            if (newShopInput.value.trim() && shops.value.length < 5) {
+                const id = "S_" + Date.now();
+                shops.value.push({ id: id, name: newShopInput.value.trim(), regalOrder: [] });
+                newShopInput.value = '';
+                if (!currentShop.value) currentShop.value = id;
+                await save();
+            }
+        };
+
+        const deleteShop = async (index) => {
+            const id = shops.value[index].id;
+            shops.value.splice(index, 1);
+            catalog.value.forEach(item => { item.laeden = item.laeden.filter(l => l !== id); if (item.laeden.length === 0 && shops.value.length > 0) item.laeden = [shops.value[0].id]; });
+            if (currentShop.value === id) currentShop.value = shops.value.length > 0 ? shops.value[0].id : '';
+            confirmDeleteShopIdx.value = null;
+            await save();
+        };
+
+        const addRegal = async () => {
+            const name = newRegalInput.value.trim();
+            if (name) {
+                if(!catalog.value.some(c => c.regal.trim() === name)) {
+                    catalog.value.push({ id: "REG_" + Date.now(), name: "(Platzhalter für " + name + ")", regal: name, laeden: shops.value.map(s => s.id), isPlaceholder: true });
+                }
+                newRegalInput.value = '';
+                await save();
+            }
+        };
+
+        const renameRegal = async (oldName, newName) => {
+            newName = newName.trim(); if (!newName || oldName === newName) return;
+            catalog.value.forEach(item => { if (item.regal.trim() === oldName.trim()) item.regal = newName; });
+            shops.value.forEach(shop => { if (shop.regalOrder) shop.regalOrder = shop.regalOrder.map(r => r.trim() === oldName.trim() ? newName : r); });
+            await save();
+        };
+
+        const moveSingleItem = async (item, newRegalName) => {
+            if (newRegalName === 'NEW') { view.value = 'plan'; search.value = item.name; onSearchInput(); showDetails.value = true; return; }
+            if (newRegalName) { item.regal = newRegalName; await save(); }
+        };
+
+        const handleRegalFocus = () => {
+            showRegalSuggestions.value = true;
+            if (newRegal.value === DEFAULT_REGAL) {
+                newRegal.value = '';
+            }
+        };
+
+        const handleRegalBlur = () => {
+            setTimeout(() => {
+                showRegalSuggestions.value = false;
+            }, 250); 
+        };
+
+        const deleteRegal = async (name) => {
+            catalog.value.forEach(item => { if (item.regal.trim() === name.trim()) item.regal = DEFAULT_REGAL; });
+            shops.value.forEach(shop => { if (shop.regalOrder) shop.regalOrder = shop.regalOrder.filter(r => r.trim() !== name.trim()); });
+            catalog.value = catalog.value.filter(c => !(c.isPlaceholder && c.regal.trim() === name.trim()));
+            confirmDeleteRegalName.value = null;
+            await save();
+        };
+
+        const updateCatalogOnly = async () => {
+            const term = search.value.trim().toLowerCase();
+            const idx = catalog.value.findIndex(c => c.name.toLowerCase() === term);
+            if (idx !== -1) { catalog.value[idx].regal = newRegal.value.trim() || DEFAULT_REGAL; catalog.value[idx].laeden = [...newShops.value]; await save(); showDetails.value = false; }
+        };
+
+        const toggleItem = async (id) => {
+            activeList.value[id].checked = !activeList.value[id].checked;
+            await saveItemToSQLite(id, activeList.value[id]);
+        };
+
+        const removeItem = async (id) => {
+            delete activeList.value[id];
+            await saveItemToSQLite(id, null); 
+        };
+
+        const clearAll = async () => {
+            activeList.value = {};
+            confirmClearAll.value = false;
+            syncStatus.value = 'syncing';
+            try {
+                const res = await fetch(apiPath('save-item'), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ clearAll: true }) 
+                });
+                if (mqttClient.value?.connected) {
+                    mqttClient.value.publish('home/einkauf/state', JSON.stringify({}), { retain: true });
+                }
+                syncStatus.value = res.ok ? 'ok' : 'error';
+            } catch (e) { syncStatus.value = 'error'; }
+        };
+
+        const selectForEdit = async (item) => { 
+            search.value = item.name; 
+            newRegal.value = item.regal; 
+            onSearchInput(); 
+            if(activeList.value[item.id]) qty.value = activeList.value[item.id].qty; 
+            view.value = 'plan'; 
+            showDetails.value = true; 
+            await nextTick(); 
+            if(qtyInput.value) qtyInput.value.focus(); 
+        };
+
+        const removeShopFromItem = async (item, shopId) => { 
+            item.laeden = item.laeden.filter(id => id !== shopId); 
+            if(item.laeden.length === 0 && shops.value.length > 0) item.laeden = [shops.value[0].id]; 
+            await save(); 
+        };
+          
+        const getFullRegalOrder = (shopId) => {
+            const shop = shops.value.find(s => s.id === shopId);
+            if (!shop) return [];
+            
+            const relevantRegals = [...new Set(catalog.value
+                .filter(c => !c.isPlaceholder && (c.laeden || []).includes(shopId))
+                .map(c => (c.regal || DEFAULT_REGAL).trim())
+            )].sort();
+            
+            const sorted = (shop.regalOrder || [])
+                .map(r => (r || '').trim())
+                .filter(r => r !== '' && relevantRegals.includes(r));
+            
+            const missing = relevantRegals.filter(r => !sorted.includes(r)).sort();
+            return [...new Set([...sorted, ...missing])];
+        };
+
+        const moveRegalInShop = async (shopId, regal, dir) => {
+            const s = shops.value.find(sh => sh.id === shopId);
+            if (!s) return;
+            
+            const currentRegal = regal.trim();
+            const fullOrder = getFullRegalOrder(shopId); 
+            const idx = fullOrder.indexOf(currentRegal);
+            const nextIdx = idx + dir;
+
+            if (idx !== -1 && nextIdx >= 0 && nextIdx < fullOrder.length) {
+                [fullOrder[idx], fullOrder[nextIdx]] = [fullOrder[nextIdx], fullOrder[idx]];
+                s.regalOrder = fullOrder;
+                await save();
+            }
+        };
+
+        const deleteItemFromCatalog = async () => {
+            const term = search.value.trim().toLowerCase();
+            const idx = catalog.value.findIndex(c => c.name.toLowerCase() === term);
+            if (idx !== -1) { 
+                const itemId = catalog.value[idx].id;
+                delete activeList.value[itemId]; 
+                catalog.value.splice(idx, 1); 
+                await save(); 
+                cancelEdit(); 
+            }
+        };
+
+        onMounted(() => {
+            applyThemePreference();
+            loadData();
+            const u = localStorage.getItem('e_u'), p = localStorage.getItem('e_p');
+            if (u && p) { creds.value.u = u; creds.value.p = p; login(); }
+            document.addEventListener('click', (e) => { 
+                if (searchInput.value && !searchInput.value.contains(e.target)) showSuggestions.value = false; 
+            });
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { 
+                if (themePreference.value === 'auto') applyThemePreference(); 
+            });
+        });
+
+        return {
+            t, appLang, saveLanguage, displayRegal, displayNewRegal,
+            view, isLoggedIn, loading, creds, catalog, shops, activeList, currentShop, 
+            mqttConnected, dataLoaded, syncStatus, showCompleted, themePreference, 
+            search, qty, isNew, newRegal, newShops, showDetails, showSuggestions, 
+            showRegalSuggestions, isListening, confirmDeleteCatalog, confirmClearAll, confirmDeleteShopIdx, 
+            confirmDeleteRegalName, newShopInput, newRegalInput, searchInput, qtyInput,
+            handleRegalFocus, handleRegalBlur, selectedShopForSort,
+            expandedSection, expandedRegalCategory, expandedItemForMove,
+
+            filteredRegalSuggestions: computed(() => {
+                const term = displayNewRegal.value.trim().toLowerCase();
+                const allRegals = [...new Set(catalog.value.map(i => (i.regal || DEFAULT_REGAL).trim()))].sort();
+                if (!term) return allRegals;
+                return allRegals.filter(r => displayRegal(r).toLowerCase().includes(term));
+            }),
+
+            selectRegalSuggestion: (r) => { 
+                newRegal.value = r; 
+                showRegalSuggestions.value = false; 
+                if (qtyInput.value) qtyInput.value.focus(); 
+            },
+            onSearchInput, selectSuggestion, addItem, toggleItem, removeItem, clearAll, 
+            selectForEdit, removeShopFromItem, moveRegalInShop, getFullRegalOrder, toggleVoice, cancelEdit, 
+            updateCatalogOnly, addShop, deleteShop, deleteItemFromCatalog, addRegal, 
+            renameRegal, deleteRegal, moveSingleItem, applyThemePreference, formatTime,
+            onSearchEnter: () => { if (qtyInput.value) qtyInput.value.focus(); },
+            logout: () => { localStorage.clear(); window.location.reload(); },
+            login, saveItemToSQLite, save,
+            getShopName: (id) => shops.value.find(s => s.id === id)?.name || id,
+            getItemCountPerRegal: (n) => catalog.value.filter(c => !c.isPlaceholder && (c.regal || '').trim() === n.trim()).length,
+            isPriorityRegal: (n) => n.trim() === DEFAULT_REGAL,
+            getItemsByRegal: (n) => catalog.value.filter(c => !c.isPlaceholder && (c.regal || '').trim() === n.trim()).sort((a,b) => a.name.localeCompare(b.name)),
+            
+            planItemsGrouped: computed(() => {
+                const g = {};
+                catalog.value.filter(c => !c.isPlaceholder && activeList.value[c.id]).forEach(i => { 
+                    const r = (i.regal || DEFAULT_REGAL).trim(); 
+                    if(!g[r]) g[r]=[]; 
+                    g[r].push(i); 
+                });
+                return Object.keys(g).sort((a,b) => {
+                    if (a === DEFAULT_REGAL) return -1;
+                    if (b === DEFAULT_REGAL) return 1;
+                    return a.localeCompare(b);
+                }).map(n => ({ name: n, items: g[n].sort((a,b) => a.name.localeCompare(b.name)) }));
+            }),
+            
+            filteredSuggestions: computed(() => search.value ? catalog.value.filter(c => !c.isPlaceholder && c.name.toLowerCase().includes(search.value.toLowerCase())).slice(0,8) : []),
+            otherRegals: computed(() => [...new Set(catalog.value.map(i => (i.regal || DEFAULT_REGAL).trim()))].filter(r => r !== DEFAULT_REGAL).sort()),
+            existingRegals: computed(() => [...new Set(catalog.value.map(i => (i.regal || DEFAULT_REGAL).trim()))].sort()),
+            visibleRegals,
+            
+            filteredItemsByRegal: computed(() => { 
+                const g = {}; 
+                catalog.value.filter(c => activeList.value[c.id] && c.laeden.includes(currentShop.value)).forEach(c => { 
+                    const key = (c.regal || DEFAULT_REGAL).trim(); 
+                    if(!g[key]) g[key]=[]; 
+                    g[key].push(c); 
+                }); 
+                
+                Object.keys(g).forEach(key => {
+                    g[key].sort((a, b) => a.name.localeCompare(b.name));
+                });
+                
+                return g; 
+            }), 
+            
+            catalogGrouped: computed(() => { 
+                const g = {}; 
+                catalog.value.filter(c => !c.isPlaceholder).forEach(i => { 
+                    const r = (i.regal || DEFAULT_REGAL).trim(); 
+                    if(!g[r]) g[r]=[]; 
+                    g[r].push(i); 
+                }); 
+                return Object.keys(g).sort((a,b) => {
+                    if (a === DEFAULT_REGAL) return -1;
+                    if (b === DEFAULT_REGAL) return 1;
+                    return a.localeCompare(b);
+                }).map(n => ({ name: n, items: g[n].sort((a,b) => a.name.localeCompare(b.name)) })); 
+            }) 
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
