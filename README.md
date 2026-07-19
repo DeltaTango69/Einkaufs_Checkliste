@@ -32,7 +32,7 @@ Features real-time synchronization via MQTT, offline-capable UI (Vue.js), and in
 
 ### **1\. Clone the repository**
 
-git clone https://github.com/YOUR\_USERNAME/einkaufs-checkliste.git  
+git clone https://github.com/DeltaTango69/einkaufs-checkliste.git  
 cd einkaufs-checkliste
 
 ### **2\. Install Dependencies**
