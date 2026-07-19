@@ -1,6 +1,6 @@
 services:
   einkauf:
-    image: ghcr.io/deltatango69/einkaufs-checkliste:latest
+    image: deltatango69/einkaufs-checkliste:latest
     container_name: einkauf
     restart: unless-stopped
     ports:
