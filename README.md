@@ -1,73 +1,52 @@
-Smart Shopping Checklist (Einkaufs-Checkliste V2.0) 🛒
+# **Smart Shopping Checklist (Einkaufs-Checkliste V2.0) 🛒**
 
 A bilingual, real-time progressive web app (PWA) designed for highly efficient family grocery shopping.
 
-🇩🇪 Deutsche Beschreibung unten
+[🇩🇪 Deutsche Beschreibung unten](#bookmark=id.8vxc7dfkwnja)
 
-✨ Features
+## **✨ Features**
 
-⚡ Real-Time Sync: Instant updates across devices via MQTT.
+* **⚡ Real-Time Sync:** Instant updates across devices via MQTT.  
+* **🌐 Bilingual:** Full support for English and German.  
+* **🌙 Dark / Light Mode:** Automatic system preference detection.  
+* **🚶‍♂️ Smart Routing:** Individual aisle sorting per store.  
+* **📦 Master Data:** Manage catalogs and categories easily.  
+* **🎤 Voice Input:** Fast item entry using Web Speech API.  
+* **📱 PWA Ready:** Installable on iOS and Android.
 
-🌐 Bilingual: Full support for English and German.
+## **🚀 Installation & Setup**
 
-🌙 Dark / Light Mode: Automatic system preference detection.
+### **Option A: The "Easy Way" (Docker Image)**
 
-🚶‍♂️ Smart Routing: Individual aisle sorting per store.
+*Recommended for quick deployments.*
 
-📦 Master Data: Manage catalogs and categories easily.
+1. **Create a data directory:**  
+   mkdir data
 
-🎤 Voice Input: Fast item entry using Web Speech API.
+2. **Copy example.env to .env and configure your settings:**  
+   cp example.env .env
 
-📱 PWA Ready: Installable on iOS and Android.
+3. **Use the provided Docker Compose file:**  
+   mv compose\_image.yaml compose.yaml  
+   docker compose up \-d
 
-🚀 Installation & Setup
+### **Option B: The "Developer Way" (Manual Setup)**
 
-Option A: The "Easy Way" (Docker Image)
+*Recommended if you want to modify the source code.*
 
-Recommended for quick deployments.
+1. **Clone the repository:**  
+   git clone https://github.com/DeltaTango69/einkaufs-checkliste.git  
+   cd einkaufs-checkliste
 
-Create a data directory:
+2. **Install Dependencies:**  
+   npm install  
+   npm install dotenv
 
-mkdir data
-
-
-Copy example.env to .env and configure your settings:
-
-cp example.env .env
-
-
-Use the provided Docker Compose file:
-
-mv compose_image.yaml compose.yaml
-docker compose up -d
-
-
-Option B: The "Developer Way" (Manual Setup)
-
-Recommended if you want to modify the source code.
-
-Clone the repository:
-
-git clone https://github.com/DeltaTango69/einkaufs-checkliste.git
-cd einkaufs-checkliste
-
-
-Install Dependencies:
-
-npm install
-npm install dotenv
-
-
-Configure:
-
-Create a .env file based on example.env.
-
-Ensure an MQTT broker with WebSocket support is running.
-
-Run the Server:
-
-node server.js
-
+3. **Configure:**  
+   * Create a .env file based on example.env.  
+   * Ensure an MQTT broker with WebSocket support is running.  
+4. **Run the Server:**  
+   node server.js
 
 ## **🇩🇪 Deutsche Beschreibung**
 
@@ -81,26 +60,20 @@ Eine zweisprachige Echtzeit-Web-App (PWA) für hocheffizientes Einkaufen in der 
 * **Spracheingabe:** Artikel einfach per Mikrofon diktieren.  
 * **Verwaltung:** Katalog, Läden und Kategorien lassen sich bequem pflegen und Artikel neu zuweisen.
 
-Starten
+### **Starten**
 
-Weg 1: Schnellstart mit Docker (Empfohlen)
+#### **Weg 1: Schnellstart mit Docker (Empfohlen)**
 
-Erstelle ein Daten-Verzeichnis: mkdir data
+1. **Erstelle ein Daten-Verzeichnis:** mkdir data  
+2. **Erstelle eine .env Datei** aus der example.env.  
+3. **Benenne compose\_image.yaml um:** mv compose\_image.yaml compose.yaml  
+4. **Starte den Container:** docker compose up \-d
 
-Erstelle eine .env Datei aus der example.env.
+#### **Weg 2: Manuelle Installation**
 
-Benenne compose_image.yaml in compose.yaml um.
+1. **Repository klonen.**  
+2. **npm install und npm install dotenv** ausführen.  
+3. **.env Datei konfigurieren.**  
+4. **Server starten:** node server.js
 
-Starte den Container: docker compose up -d
-
-Weg 2: Manuelle Installation
-
-Repository klonen.
-
-npm install und npm install dotenv ausführen.
-
-.env Datei konfigurieren.
-
-Server starten mit node server.js.
-
-Developed with Vue.js & Node.js
+*Developed with Vue.js & Node.js*
