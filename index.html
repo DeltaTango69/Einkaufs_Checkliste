@@ -125,10 +125,14 @@
             box-shadow: 0 8px 20px rgba(0,0,0,0.3); 
             z-index: 1100; 
             max-height: 200px; 
-            overflow-y: auto; 
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
+            overscroll-behavior: contain;
         }
 
-        .suggestion-item { padding: 14px 15px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .suggestion-item { padding: 14px 15px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; touch-action: manipulation; }
         .suggestion-item:hover { background: var(--bg); }
         
         .btn-primary { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 10px; cursor: pointer; width: 100%; font-weight: 700; font-size: 1.1rem; margin-top: 10px; }
@@ -227,7 +231,7 @@
                 <div style="position: relative;">
                     <input type="text" v-model="search" ref="searchInput" autocomplete="off" :placeholder="t('plan_search_ph')" @input="onSearchInput" @keyup.enter="onSearchEnter">
                     <div v-if="showSuggestions && filteredSuggestions.length > 0" class="suggestion-box">
-                        <div v-for="s in filteredSuggestions" :key="s.id" class="suggestion-item" @mousedown.prevent="selectSuggestion(s)" @touchstart.prevent="selectSuggestion(s)">
+                        <div v-for="s in filteredSuggestions" :key="s.id" class="suggestion-item" @click="selectSuggestion(s)">
                             <span>{{ s.name }}</span>
                             <span style="font-size:0.7rem; color:var(--text-muted)">{{ displayRegal(s.regal) }}</span>
                         </div>
@@ -247,7 +251,7 @@
                                 @blur="handleRegalBlur">
                         
                         <div v-if="showRegalSuggestions && filteredRegalSuggestions.length > 0" class="regal-suggestion-box">
-                            <div v-for="r in filteredRegalSuggestions" :key="r" class="suggestion-item" @mousedown.prevent="selectRegalSuggestion(r)" @touchstart.prevent="selectRegalSuggestion(r)">
+                            <div v-for="r in filteredRegalSuggestions" :key="r" class="suggestion-item" @click="selectRegalSuggestion(r)">
                                 <span>{{ displayRegal(r) }}</span>
                             </div>
                         </div>
@@ -532,7 +536,7 @@ const DEFAULT_REGAL = "⚠️ Kategorie zuweisen!";
 
 const translations = {
     de: {
-        app_title: "V2.0",
+        app_title: "V2.2",
         login_title: "🔑 Login",
         user_ph: "Benutzername",
         pass_ph: "Passwort",
@@ -609,7 +613,7 @@ const translations = {
         items_count: "Artikel"
     },
     en: {
-        app_title: "V2.0",
+        app_title: "V2.2",
         login_title: "🔑 Login",
         user_ph: "Username",
         pass_ph: "Password",
@@ -1004,9 +1008,11 @@ createApp({
         };
 
         const handleRegalBlur = () => {
+            // Etwas Zeit lassen, damit ein Klick auf einen Eintrag
+            // nach dem Verlassen des Eingabefeldes noch ausgeführt wird.
             setTimeout(() => {
                 showRegalSuggestions.value = false;
-            }, 250); 
+            }, 350); 
         };
 
         const deleteRegal = async (name) => {
