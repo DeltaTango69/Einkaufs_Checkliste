@@ -1,4 +1,4 @@
-# **Smart Shopping Checklist (Einkaufs-Checkliste V2.2) 🛒**
+# **Smart Shopping Checklist (Einkaufs-Checkliste V2.3) 🛒**
 
 A bilingual, real-time progressive web app (PWA) designed for highly efficient family grocery shopping.
 
