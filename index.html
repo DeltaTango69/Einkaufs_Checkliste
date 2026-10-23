@@ -148,6 +148,12 @@
         .item-row { display: flex; align-items: center; padding: 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
         .qty-badge { background: var(--accent); padding: 4px 12px; border-radius: 8px; font-size: 0.9rem; margin-right: 15px; font-weight: 800; min-width: 35px; text-align: center; color: #000; }
         .item-name { flex-grow: 1; font-size: 1.1rem; }
+        .already-hint { background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 10px; padding: 10px 14px; margin: 4px 0 8px; font-size: 0.9rem; font-weight: 700; }
+        .cart-ctrl { display: flex; align-items: center; gap: 6px; margin-right: 10px; flex-shrink: 0; }
+        .cart-ctrl .qty-badge { margin-right: 0; min-width: 28px; padding: 4px 8px; }
+        .cart-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--primary); color: #fff; font-size: 1.3rem; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; }
+        .cart-btn.minus { background: var(--border); color: var(--text-main); }
+        .item-row.item-selected { background: var(--warning-bg); border-left: 5px solid var(--accent); padding-left: 9px; }
         .item-name.done { text-decoration: line-through; color: var(--text-muted); }
         .item-meta { font-size: 0.7rem; color: var(--text-muted); display: block; margin-top: 2px; }
 
@@ -216,7 +222,7 @@
     <!-- App Inhalt -->
     <div v-else style="display:contents">
         <div class="nav-tabs">
-            <button @click="view = 'plan'" :class="['nav-btn', { active: view === 'plan' }]">{{ t('tab_plan') }}</button>
+            <button @click="view = 'plan'; cameFromCatalog = false" :class="['nav-btn', { active: view === 'plan' }]">{{ t('tab_plan') }}</button>
             <button @click="view = 'shop'" :class="['nav-btn', { active: view === 'shop' }]">{{ t('tab_shop') }}</button>
             <button @click="view = 'catalog'" :class="['nav-btn', { active: view === 'catalog' }]">{{ t('tab_cart') }}</button>
             <button @click="view = 'settings'" :class="['nav-btn', { active: view === 'settings' }]">{{ t('tab_settings') }}</button>
@@ -232,11 +238,13 @@
                     <input type="text" v-model="search" ref="searchInput" autocomplete="off" :placeholder="t('plan_search_ph')" @input="onSearchInput" @keyup.enter="onSearchEnter">
                     <div v-if="showSuggestions && filteredSuggestions.length > 0" class="suggestion-box">
                         <div v-for="s in filteredSuggestions" :key="s.id" class="suggestion-item" @click="selectSuggestion(s)">
-                            <span>{{ s.name }}</span>
+                            <span>{{ s.name }}<span v-if="activeList[s.id]" style="margin-left:8px; font-size:0.75rem; color:var(--success); font-weight:700;">✅ {{ activeList[s.id].qty }}x</span></span>
                             <span style="font-size:0.7rem; color:var(--text-muted)">{{ displayRegal(s.regal) }}</span>
                         </div>
                     </div>
                 </div>
+
+                <div v-if="alreadyInList" class="already-hint">✅ {{ t('already_in_list') }} ({{ alreadyInList.qty }}x)</div>
 
                 <div class="input-row" style="display: flex; gap: 20px; align-items: flex-start;">
                     <!-- Regal-Feld -->
@@ -272,7 +280,7 @@
 
                 <div style="display: flex; flex-direction: column;">
                     <button @click="addItem" class="btn-primary" :disabled="!search">{{ isNew ? t('btn_create_add') : t('btn_add') }}</button>
-                    <button v-if="search.trim()" @click="cancelEdit" class="btn-outline">{{ t('btn_cancel') }}</button>
+                    <button v-if="search.trim()" @click="cancelAndReturn" class="btn-outline">{{ t('btn_cancel') }}</button>
                 </div>
 
                 <div v-if="search.trim()" @click="showDetails = !showDetails" class="edit-toggle">
@@ -357,10 +365,19 @@
         <div v-if="view === 'catalog'">
             <div class="section">
                 <h2>{{ t('tab_cart') }} ({{ catalog.length }})</h2>
+                <select v-model="catalogSort">
+                    <option value="regal">{{ t('sort_regal') }}</option>
+                    <option value="popular">{{ t('sort_popular') }}</option>
+                </select>
                 <div v-for="group in catalogGrouped" :key="group.name">
-                    <div class="regal-header"><span>{{ displayRegal(group.name) }}</span></div>
-                    <div v-for="item in group.items" :key="item.id" class="item-row" @click="selectForEdit(item)">
-                        <span style="flex-grow:1">{{ item.name }}</span>
+                    <div v-if="catalogSort === 'regal'" class="regal-header"><span>{{ displayRegal(group.name) }}</span></div>
+                    <div v-for="item in group.items" :key="item.id" class="item-row" :class="{ 'item-selected': activeList[item.id] }" @click="selectForEdit(item)">
+                        <div class="cart-ctrl" @click.stop>
+                            <button v-if="activeList[item.id]" class="cart-btn minus" @click="changeQty(item, -1)">−</button>
+                            <span v-if="activeList[item.id]" class="qty-badge">{{ activeList[item.id].qty }}x</span>
+                            <button class="cart-btn" @click="changeQty(item, 1)">＋</button>
+                        </div>
+                        <span style="flex-grow:1; min-width:0;">{{ item.name }}<span v-if="catalogSort === 'popular'" class="item-meta">{{ displayRegal(item.regal) }} • {{ t('bought_times').replace('{n}', item.buyCount || 0) }}</span></span>
                         <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end;">
                             <button v-for="sid in item.laeden" :key="sid" style="font-size:0.65rem; background:var(--border); border:none; border-radius:6px; padding:4px 8px; font-weight:700; color:var(--text-muted)" @click.stop="removeShopFromItem(item, sid)">{{ getShopName(sid) }} ✕</button>
                         </div>
@@ -530,13 +547,13 @@
 </div>
 
 <script>
-const { createApp, ref, computed, onMounted, nextTick } = Vue;
+const { createApp, ref, computed, watch, onMounted, nextTick } = Vue;
 
 const DEFAULT_REGAL = "⚠️ Kategorie zuweisen!";
 
 const translations = {
     de: {
-        app_title: "V2.2",
+        app_title: "V2.3",
         login_title: "🔑 Login",
         user_ph: "Benutzername",
         pass_ph: "Passwort",
@@ -610,10 +627,14 @@ const translations = {
         no_items_shop: "Dieser Laden hat noch keine zugewiesenen Artikel.",
         btn_logout: "Abmelden",
         default_regal: "⚠️ Kategorie zuweisen!",
-        items_count: "Artikel"
+        items_count: "Artikel",
+        already_in_list: "Steht schon auf der Liste",
+        sort_regal: "Sortierung: nach Regal",
+        sort_popular: "Sortierung: meist gekauft",
+        bought_times: "{n}× gekauft"
     },
     en: {
-        app_title: "V2.2",
+        app_title: "V2.3",
         login_title: "🔑 Login",
         user_ph: "Username",
         pass_ph: "Password",
@@ -687,7 +708,11 @@ const translations = {
         no_items_shop: "This shop has no assigned items yet.",
         btn_logout: "Logout",
         default_regal: "⚠️ Assign category!",
-        items_count: "Items"
+        items_count: "Items",
+        already_in_list: "Already on the list",
+        sort_regal: "Sort: by category",
+        sort_popular: "Sort: most bought",
+        bought_times: "bought {n}×"
     }
 };
 
@@ -730,6 +755,11 @@ createApp({
         const expandedSection = ref('lang');
         const expandedRegalCategory = ref('');
         const expandedItemForMove = ref(null);
+        const cameFromCatalog = ref(false);
+        const catalogScrollY = ref(0);
+        watch(view, (v) => { if (v !== 'plan') cameFromCatalog.value = false; });
+        const catalogSort = ref(localStorage.getItem('app_catalog_sort') === 'popular' ? 'popular' : 'regal');
+        watch(catalogSort, (v) => localStorage.setItem('app_catalog_sort', v));
 
         // i18n Translation Funktion
         const t = (key) => translations[appLang.value][key] || key;
@@ -770,6 +800,14 @@ createApp({
             
             const missing = activeRegals.filter(r => !sorted.includes(r)).sort();
             return [...new Set([...sorted, ...missing])];
+        });
+
+        // Steht der eingegebene Artikel bereits auf der Einkaufsliste?
+        const alreadyInList = computed(() => {
+            const term = search.value.trim().toLowerCase();
+            if (!term) return null;
+            const item = catalog.value.find(c => !c.isPlaceholder && c.name.toLowerCase() === term);
+            return item ? (activeList.value[item.id] || null) : null;
         });
 
         const apiPath = (end) => window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/') + 'api/' + end;
@@ -890,13 +928,13 @@ createApp({
             }
         };
 
-        const saveItemToSQLite = async (id, itemData, catalogData = null) => {
+        const saveItemToSQLite = async (id, itemData, catalogData = null, buyDelta = 0) => {
             syncStatus.value = 'syncing';
             try {
                 const res = await fetch(apiPath('save-item'), {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ id, itemData, catalogData })
+                    body: JSON.stringify({ id, itemData, catalogData, buyDelta })
                 });
                 if (res.ok) {
                     syncStatus.value = 'ok';
@@ -932,6 +970,7 @@ createApp({
             activeList.value[item.id] = activeEntry;
             await saveItemToSQLite(item.id, activeEntry, item);
             cancelEdit();
+            await returnToCatalog();
         };
 
         const save = async () => {
@@ -957,6 +996,21 @@ createApp({
         };
 
         const cancelEdit = () => { search.value = ''; qty.value = 1; showDetails.value = false; showSuggestions.value = false; isNew.value = true; newRegal.value = ''; newShops.value = []; if (searchInput.value) searchInput.value.focus(); };
+
+        // Zurück in den Warenkorb (nur wenn der Dialog von dort geöffnet wurde)
+        const returnToCatalog = async () => {
+            if (!cameFromCatalog.value) return;
+            const y = catalogScrollY.value;
+            cameFromCatalog.value = false;
+            view.value = 'catalog';
+            await nextTick();
+            window.scrollTo(0, y);
+        };
+
+        const cancelAndReturn = async () => {
+            cancelEdit();
+            await returnToCatalog();
+        };
 
         const addShop = async () => {
             if (newShopInput.value.trim() && shops.value.length < 5) {
@@ -1030,8 +1084,29 @@ createApp({
         };
 
         const toggleItem = async (id) => {
-            activeList.value[id].checked = !activeList.value[id].checked;
-            await saveItemToSQLite(id, activeList.value[id]);
+            const entry = activeList.value[id];
+            entry.checked = !entry.checked;
+            // Kaufhäufigkeit mitzählen (abgehakt = gekauft)
+            const delta = entry.checked ? 1 : -1;
+            const item = catalog.value.find(c => c.id === id);
+            if (item) item.buyCount = Math.max(0, (item.buyCount || 0) + delta);
+            await saveItemToSQLite(id, entry, null, item ? delta : 0);
+        };
+
+        // Direkt aus dem Warenkorb: Menge ändern bzw. Artikel auf die Liste setzen / entfernen
+        const changeQty = async (item, delta) => {
+            const cur = activeList.value[item.id];
+            if (!cur || (cur.checked && delta > 0)) {
+                if (delta < 0) return;
+                const entry = { qty: 1, checked: false, addedBy: creds.value.u, addedAt: new Date().toISOString() };
+                activeList.value[item.id] = entry;
+                await saveItemToSQLite(item.id, entry, item);
+                return;
+            }
+            const newQty = (Number(cur.qty) || 1) + delta;
+            if (newQty < 1) { await removeItem(item.id); return; }
+            cur.qty = newQty;
+            await saveItemToSQLite(item.id, cur);
         };
 
         const removeItem = async (id) => {
@@ -1056,7 +1131,9 @@ createApp({
             } catch (e) { syncStatus.value = 'error'; }
         };
 
-        const selectForEdit = async (item) => { 
+        const selectForEdit = async (item) => {
+            cameFromCatalog.value = (view.value === 'catalog');
+            if (cameFromCatalog.value) catalogScrollY.value = window.scrollY; 
             search.value = item.name; 
             newRegal.value = item.regal; 
             onSearchInput(); 
@@ -1114,7 +1191,8 @@ createApp({
                 delete activeList.value[itemId]; 
                 catalog.value.splice(idx, 1); 
                 await save(); 
-                cancelEdit(); 
+                cancelEdit();
+                await returnToCatalog(); 
             }
         };
 
@@ -1140,6 +1218,7 @@ createApp({
             confirmDeleteRegalName, newShopInput, newRegalInput, searchInput, qtyInput,
             handleRegalFocus, handleRegalBlur, selectedShopForSort,
             expandedSection, expandedRegalCategory, expandedItemForMove,
+            cameFromCatalog, cancelAndReturn, alreadyInList, catalogSort, changeQty,
 
             filteredRegalSuggestions: computed(() => {
                 const term = displayNewRegal.value.trim().toLowerCase();
@@ -1199,7 +1278,12 @@ createApp({
                 return g; 
             }), 
             
-            catalogGrouped: computed(() => { 
+            catalogGrouped: computed(() => {
+                if (catalogSort.value === 'popular') {
+                    const all = catalog.value.filter(c => !c.isPlaceholder)
+                        .sort((a, b) => (b.buyCount || 0) - (a.buyCount || 0) || a.name.localeCompare(b.name));
+                    return all.length ? [{ name: '', items: all }] : [];
+                } 
                 const g = {}; 
                 catalog.value.filter(c => !c.isPlaceholder).forEach(i => { 
                     const r = (i.regal || DEFAULT_REGAL).trim(); 

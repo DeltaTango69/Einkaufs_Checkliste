@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
@@ -22,7 +21,11 @@ const db = new sqlite3.Database(DB_FILE, (err) => {
 
 db.serialize(() => {
     db.run("CREATE TABLE IF NOT EXISTS shops (id TEXT PRIMARY KEY, name TEXT, regalOrder TEXT)");
-    db.run("CREATE TABLE IF NOT EXISTS catalog (id TEXT PRIMARY KEY, name TEXT, regal TEXT, laeden TEXT, isPlaceholder INTEGER)");
+    db.run("CREATE TABLE IF NOT EXISTS catalog (id TEXT PRIMARY KEY, name TEXT, regal TEXT, laeden TEXT, isPlaceholder INTEGER, buyCount INTEGER DEFAULT 0)");
+    // Migration: Spalte buyCount in bestehenden Datenbanken nachrüsten (Fehler "duplicate column" ist erwartet)
+    db.run("ALTER TABLE catalog ADD COLUMN buyCount INTEGER DEFAULT 0", (err) => {
+        if (err && !/duplicate column/i.test(err.message)) console.error("Migration buyCount:", err.message);
+    });
     db.run("CREATE TABLE IF NOT EXISTS active_list (id TEXT PRIMARY KEY, qty INTEGER, checked INTEGER, addedBy TEXT, addedAt TEXT)");
 });
 
@@ -40,7 +43,7 @@ app.get('/api/data', (req, res) => {
         
         db.all("SELECT * FROM catalog", [], (err, cRows) => {
             if (err) return res.status(500).json({ error: err.message });
-            data.catalog = cRows.map(r => ({...r, laeden: JSON.parse(r.laeden || '[]'), isPlaceholder: !!r.isPlaceholder}));
+            data.catalog = cRows.map(r => ({...r, laeden: JSON.parse(r.laeden || '[]'), isPlaceholder: !!r.isPlaceholder, buyCount: r.buyCount || 0}));
             
             db.all("SELECT * FROM active_list", [], (err, aRows) => {
                 if (err) return res.status(500).json({ error: err.message });
@@ -55,7 +58,7 @@ app.get('/api/data', (req, res) => {
 
 // API: Einzelnes Item speichern oder Liste leeren
 app.post('/api/save-item', (req, res) => {
-    const { id, itemData, catalogData, clearAll } = req.body;
+    const { id, itemData, catalogData, clearAll, buyDelta } = req.body;
     
     db.serialize(() => {
         if (clearAll) {
@@ -67,8 +70,15 @@ app.post('/api/save-item', (req, res) => {
         }
         
         if (catalogData) {
-            db.run("INSERT OR REPLACE INTO catalog (id, name, regal, laeden, isPlaceholder) VALUES (?, ?, ?, ?, ?)",
-                [catalogData.id, catalogData.name, catalogData.regal, JSON.stringify(catalogData.laeden), catalogData.isPlaceholder ? 1 : 0]);
+            // buyCount bleibt dabei erhalten (wird nur über buyDelta verändert)
+            db.run("INSERT OR REPLACE INTO catalog (id, name, regal, laeden, isPlaceholder, buyCount) VALUES (?, ?, ?, ?, ?, COALESCE((SELECT buyCount FROM catalog WHERE id = ?), 0))",
+                [catalogData.id, catalogData.name, catalogData.regal, JSON.stringify(catalogData.laeden), catalogData.isPlaceholder ? 1 : 0, catalogData.id]);
+        }
+
+        // Kaufzähler atomar auf dem Server hochzählen / zurücknehmen (abgehakt = gekauft)
+        const delta = Math.max(-1, Math.min(1, parseInt(buyDelta, 10) || 0));
+        if (delta !== 0 && id) {
+            db.run("UPDATE catalog SET buyCount = MAX(0, COALESCE(buyCount, 0) + ?) WHERE id = ?", [delta, id]);
         }
         
         if (itemData) {
@@ -93,10 +103,13 @@ app.post('/api/save-all', (req, res) => {
         shops.forEach(s => shopStmt.run(s.id, s.name, JSON.stringify(s.regalOrder)));
         shopStmt.finalize();
         
+        db.run("DROP TABLE IF EXISTS temp.old_counts");
+        db.run("CREATE TEMP TABLE old_counts AS SELECT id, buyCount FROM catalog");
         db.run("DELETE FROM catalog");
-        const catStmt = db.prepare("INSERT INTO catalog (id, name, regal, laeden, isPlaceholder) VALUES (?, ?, ?, ?, ?)");
-        catalog.forEach(c => catStmt.run(c.id, c.name, c.regal, JSON.stringify(c.laeden), c.isPlaceholder ? 1 : 0));
+        const catStmt = db.prepare("INSERT INTO catalog (id, name, regal, laeden, isPlaceholder, buyCount) VALUES (?, ?, ?, ?, ?, COALESCE((SELECT buyCount FROM old_counts WHERE id = ?), ?))");
+        catalog.forEach(c => catStmt.run(c.id, c.name, c.regal, JSON.stringify(c.laeden), c.isPlaceholder ? 1 : 0, c.id, c.buyCount || 0));
         catStmt.finalize();
+        db.run("DROP TABLE IF EXISTS temp.old_counts");
 
         if (activeList) {
             db.run("DELETE FROM active_list");
